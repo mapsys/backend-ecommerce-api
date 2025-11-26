@@ -1,0 +1,293 @@
+{
+	"info": {
+		"_postman_id": "e7410ab9-079a-4d9b-9753-16326ca38b58",
+		"name": "Curso_Backend_pisano",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "45443090",
+		"_collection_link": "https://mariano-8483223.postman.co/workspace/Mariano's-Workspace~b8c61fac-43c6-47c3-8e83-48e69bb75021/collection/45443090-e7410ab9-079a-4d9b-9753-16326ca38b58?action=share&source=collection_link&creator=45443090"
+	},
+	"item": [
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "getAllProducts",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/products"
+					},
+					"response": []
+				},
+				{
+					"name": "getproductById",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/products/2"
+					},
+					"response": []
+				},
+				{
+					"name": "addNewProducts",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"thumbnail\": \"http://http2.mlstatic.com/D_738318-MLU72027189565_092023-I.jpg\",\n    \"title\": \"Testeando la api\",\n    \"description\": \"un simple producto para testear la api\",\n    \"price\": 100,\n    \"stock\": 60,\n    \"code\": \"NEW004\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/products"
+					},
+					"response": []
+				},
+				{
+					"name": "UpdateProduct",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stock\": 800\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/products/16"
+					},
+					"response": []
+				},
+				{
+					"name": "deleteProduct",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"thumbnail\": \"http://http2.mlstatic.com/D_738318-MLU72027189565_092023-I.jpg\",\n    \"title\": \"Testeando la api\",\n    \"description\": \"un simple producto para testear la api\",\n    \"price\": 100,\n    \"stock\": 60,\n    \"code\": \"NEW005\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/products/16"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Carts",
+			"item": [
+				{
+					"name": "addProductToCart",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qty\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/carts/20/products/24"
+					},
+					"response": []
+				},
+				{
+					"name": "getCart",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/carts/10"
+					},
+					"response": []
+				},
+				{
+					"name": "createNewCart",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": "http://localhost:8080/api/carts"
+					},
+					"response": []
+				},
+				{
+					"name": "DeleteProductFromACart",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "http://localhost:8080/api/carts/6875188d0e737259e872774b/products/68702f40651d8d75378a7837"
+					},
+					"response": []
+				},
+				{
+					"name": "changeCartProducts",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"products\":[\n        {\"product\" : 123456, \"quantity\": 12}\n\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/carts/6875188d0e737259e872774b"
+					},
+					"response": []
+				},
+				{
+					"name": "changeProductsQty",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qty\":10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/carts/68752773230a72843a7b8969/products/68702f40651d8d75378a7837"
+					},
+					"response": []
+				},
+				{
+					"name": "getCartTotales",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/carts/6872ef12b4aecb341b631c6c/totales"
+					},
+					"response": []
+				},
+				{
+					"name": "emptyCart",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": "http://localhost:8080/api/carts/68752773230a72843a7b8969"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"first_name\": \"Mariano\", \n    \"last_name\": \"Pisano\", \n    \"email\": \"mariano2@coder.com\",\n    \"password\": \"12345\",\n    \"age\":50\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/sessions/register"
+					},
+					"response": []
+				},
+				{
+					"name": "login",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"mariano@coder.com\",\n    \"password\":\"12345\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "http://localhost:8080/api/sessions/login"
+					},
+					"response": []
+				},
+				{
+					"name": "current",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/sessions/current"
+					},
+					"response": []
+				},
+				{
+					"name": "logout",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": "http://localhost:8080/api/sessions/logout"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

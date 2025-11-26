@@ -1,0 +1,10 @@
+      <div class="producto tarjeta-horizontal">
+        <div class="producto-imagen-container">
+          <img class="producto-imagen" src="{{firstThumbnail thumbnails}}" alt="{{title}}" />
+        </div>
+        <div class="producto-detalle">
+          <h5 class="producto-titulo">{{title}}</h5>
+          <p class="producto-precio">${{price}}</p>
+          <button class="producto-agregar" data-id="{{_id}}">Agregar al carrito</button>
+        </div>
+      </div>
