@@ -51,11 +51,10 @@ export const iniciarPassport = () => {
       },
       async (payload, done) => {
         try {
-          // buscar el usuario “real” en BD para tener cart y demás campos frescos
+          // buscar el usuario "real" en BD para tener cart y demás campos frescos
           const user = await userService.findByIdSafe(payload._id);
           if (!user) return done(null, false, { message: "Usuario no encontrado" });
-          delete user.password;
-          return done(null, user);
+          return done(null, user); // findByIdSafe ya elimina el password
         } catch (error) {
           return done(error);
         }
