@@ -55,8 +55,7 @@ export default class ProductDAO {
 
   async getProductById(id) {
     const product = await Producto.findById(id).lean();
-    if (!product) throw new Error("Producto no encontrado");
-    return product;
+    return product; // Retorna null si no encuentra, el Service maneja el error
   }
 
   async updateProduct(id, updatedFields) {

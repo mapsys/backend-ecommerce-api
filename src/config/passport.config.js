@@ -24,8 +24,8 @@ export const iniciarPassport = () => {
         });
         return done(null, user);
       } catch (error) {
-        // Podés mapear status→message si querés
-        return done(null, false, { message: error.message });
+        // Pasar el status del error para que passportCall lo use
+        return done(null, false, { message: error.message, status: error.status || 400 });
       }
     })
   );

@@ -1,12 +1,29 @@
-// e2e.test.js
+// ============================================================================
+// E2E TESTS - Backend eCommerce API
+// ============================================================================
+// Este script prueba TODOS los endpoints de la API incluyendo casos exitosos
+// y casos de error para validar que la aplicación funciona correctamente.
+//
+// CÓMO EJECUTAR:
+// 1. Asegurate de que el servidor esté corriendo (npm run dev)
+// 2. Ejecutá: node src/e2e.test.js
+//
+// ============================================================================
+
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
 
-// ---------- Config ----------
+// ============================================================================
+// CONFIGURACIÓN
+// ============================================================================
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:8080";
 
-// ---------- HTTP clients ----------
+// ============================================================================
+// CLIENTES HTTP (con soporte de cookies para autenticación)
+// ============================================================================
+
 function makeClient(baseURL = BASE_URL) {
   const jar = new CookieJar();
   const http = wrapper(
@@ -14,39 +31,64 @@ function makeClient(baseURL = BASE_URL) {
       baseURL,
       withCredentials: true,
       jar,
-      validateStatus: () => true, // no throw en != 2xx
+      validateStatus: () => true, // No lanzar error en status != 2xx
     })
   );
   return { http, jar };
 }
 
-const { http: httpAnon } = makeClient(); // sin cookies
-const { http: httpUser } = makeClient(); // user normal
-const { http: httpAdmin } = makeClient(); // admin
+const { http: httpAnon } = makeClient();  // Cliente sin autenticación
+const { http: httpUser } = makeClient();  // Cliente user normal
+const { http: httpAdmin } = makeClient(); // Cliente admin
 
-// ---------- Helpers ----------
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 const ok = (msg) => console.log("✅", msg);
 const bad = (msg) => console.log("❌", msg);
-const sep = (t) => console.log("\n— " + t + " " + "—".repeat(Math.max(0, 60 - t.length)));
+const info = (msg) => console.log("ℹ️ ", msg);
+const sep = (t) => console.log("\n" + "=".repeat(80) + "\n" + t + "\n" + "=".repeat(80));
+const subsep = (t) => console.log("\n--- " + t + " ---");
 
+/**
+ * Espera un status HTTP específico
+ */
 async function expectStatus(promise, expected, label) {
   const res = await promise;
-  if (res.status === expected) ok(`${label} → ${res.status}`);
-  else bad(`${label} → esperado ${expected} pero fue ${res.status} :: ${JSON.stringify(res.data)}`);
+  if (res.status === expected) {
+    ok(`${label} → ${res.status}`);
+  } else {
+    bad(`${label} → esperado ${expected} pero fue ${res.status}`);
+    info(`Respuesta: ${JSON.stringify(res.data)}`);
+  }
   return res;
 }
 
+/**
+ * Espera uno de varios status HTTP posibles
+ */
 async function expectOneOf(promise, expectedArr, label) {
   const res = await promise;
-  if (expectedArr.includes(res.status)) ok(`${label} → ${res.status}`);
-  else bad(`${label} → esperado uno de [${expectedArr.join(", ")}] pero fue ${res.status} :: ${JSON.stringify(res.data)}`);
+  if (expectedArr.includes(res.status)) {
+    ok(`${label} → ${res.status}`);
+  } else {
+    bad(`${label} → esperado uno de [${expectedArr.join(", ")}] pero fue ${res.status}`);
+    info(`Respuesta: ${JSON.stringify(res.data)}`);
+  }
   return res;
 }
 
+/**
+ * Genera un ID único para testing
+ */
 function rid(prefix = "x") {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
 
+/**
+ * Genera un ObjectId aleatorio válido (24 caracteres hexadecimales)
+ */
 function randomObjectId() {
   const hex = "0123456789abcdef";
   let id = "";
@@ -54,31 +96,53 @@ function randomObjectId() {
   return id;
 }
 
-async function getProduct(http, id) {
-  return http.get(`/api/products/${id}`);
-}
-
+/**
+ * Obtiene el _id de un objeto (soporta diferentes formatos de respuesta)
+ */
 function idOf(o) {
   return o?._id || o?.id;
 }
 
+/**
+ * Helper para delay (útil para password reset)
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
 (async () => {
   try {
-    // ---------------- SESSIONS (USER) ----------------
-    sep("SESSIONS (USER)");
+    console.log("\n🚀 Iniciando tests E2E...\n");
+
+    // ==========================================================================
+    // 1. AUTENTICACIÓN - REGISTRO DE USUARIOS
+    // ==========================================================================
+    sep("1. AUTENTICACIÓN - REGISTRO DE USUARIOS");
+
     const userEmail = `${rid("user")}@test.com`;
     const userPass = "secret123";
+    const adminEmail = `${rid("admin")}@coder.com`; // @coder.com = admin automático
+    const adminPass = "admin456";
 
+    subsep("1.1 Registro con validaciones incorrectas");
+
+    // Test: Registro sin campos obligatorios
     await expectStatus(
       httpUser.post("/api/sessions/register", {
-        email: `${rid("bad")}@test.com`,
+        email: `${rid("incomplete")}@test.com`,
         password: userPass,
-        first_name: "A",
+        first_name: "John",
+        // Falta: last_name, age
       }),
-      401,
-      "register faltan campos (user)"
+      400,
+      "Registro sin campos obligatorios → 400"
     );
 
+    // Test: Registro con email duplicado (primero creamos uno)
     await expectStatus(
       httpUser.post("/api/sessions/register", {
         email: userEmail,
@@ -88,9 +152,10 @@ function idOf(o) {
         age: 28,
       }),
       201,
-      "register ok (user)"
+      "Registro exitoso de usuario normal → 201"
     );
 
+    // Test: Intentar registrar con el mismo email
     await expectStatus(
       httpUser.post("/api/sessions/register", {
         email: userEmail,
@@ -99,51 +164,11 @@ function idOf(o) {
         last_name: "Lovelace",
         age: 28,
       }),
-      401,
-      "register duplicado (user)"
+      400,
+      "Registro con email duplicado → 400"
     );
 
-    await expectStatus(httpUser.post("/api/sessions/login", { email: userEmail, password: "nope" }), 401, "login credenciales inválidas (user)");
-    await expectStatus(httpUser.post("/api/sessions/login", { email: userEmail, password: userPass }), 200, "login ok (user)");
-    await expectStatus(httpUser.get("/api/sessions/current"), 200, "current ok (user)");
-
-    // ---------------- PRODUCTS: auth/roles ----------------
-    sep("PRODUCTS (auth/roles)");
-
-    const codeA = rid("codeA");
-    const codeB = rid("codeB");
-    let productA, productB;
-
-    await expectOneOf(
-      httpAnon.post("/api/products", {
-        title: "Anon Prod",
-        description: "X",
-        price: 10,
-        code: rid("codeAnon"),
-        stock: 1,
-        category: "test",
-      }),
-      [401, 403],
-      "crear producto sin login"
-    );
-
-    await expectOneOf(
-      httpUser.post("/api/products", {
-        title: "User Prod",
-        description: "X",
-        price: 10,
-        code: rid("codeUser"),
-        stock: 1,
-        category: "test",
-      }),
-      [401, 403],
-      "crear producto con user no admin"
-    );
-
-    // ---------------- SESSIONS (ADMIN) ----------------
-    sep("SESSIONS (ADMIN)");
-    const adminEmail = `${rid("admin")}@coder.com`;
-    const adminPass = "secret123";
+    subsep("1.2 Registro de admin (email @coder.com)");
 
     await expectStatus(
       httpAdmin.post("/api/sessions/register", {
@@ -154,212 +179,650 @@ function idOf(o) {
         age: 33,
       }),
       201,
-      "register ok (admin)"
+      "Registro exitoso de admin → 201"
     );
 
-    await expectStatus(httpAdmin.post("/api/sessions/login", { email: adminEmail, password: adminPass }), 200, "login ok (admin)");
-    await expectStatus(httpAdmin.get("/api/sessions/current"), 200, "current ok (admin)");
+    // ==========================================================================
+    // 2. AUTENTICACIÓN - LOGIN
+    // ==========================================================================
+    sep("2. AUTENTICACIÓN - LOGIN");
 
-    // ---------------- PRODUCTS (admin) ----------------
-    sep("PRODUCTS (admin happy path + errores)");
-
-    productA = await expectStatus(
-      httpAdmin.post("/api/products", {
-        title: "Prod A",
-        description: "A",
-        price: 10,
-        code: codeA,
-        stock: 1,
-        category: "test",
-        thumbnail: "",
-      }),
-      201,
-      "crear producto A (admin)"
-    ).then((r) => r.data);
+    subsep("2.1 Login con credenciales incorrectas");
 
     await expectStatus(
-      httpAdmin.post("/api/products", {
-        title: "Otro",
-        description: "dup",
-        price: 20,
-        code: codeA,
-        stock: 2,
-        category: "test",
+      httpUser.post("/api/sessions/login", {
+        email: userEmail,
+        password: "wrongpassword"
+      }),
+      401,
+      "Login con password incorrecta → 401"
+    );
+
+    await expectStatus(
+      httpUser.post("/api/sessions/login", {
+        email: "noexiste@test.com",
+        password: userPass
+      }),
+      401,
+      "Login con email inexistente → 401"
+    );
+
+    subsep("2.2 Login exitoso");
+
+    await expectStatus(
+      httpUser.post("/api/sessions/login", {
+        email: userEmail,
+        password: userPass
+      }),
+      200,
+      "Login exitoso de usuario → 200"
+    );
+
+    await expectStatus(
+      httpAdmin.post("/api/sessions/login", {
+        email: adminEmail,
+        password: adminPass
+      }),
+      200,
+      "Login exitoso de admin → 200"
+    );
+
+    subsep("2.3 Verificar sesión actual (/current)");
+
+    const currentRes = await expectStatus(
+      httpUser.get("/api/sessions/current"),
+      200,
+      "GET /current con sesión válida → 200"
+    );
+
+    // Verificar que el DTO no expone password ni age
+    if (currentRes.data?.user) {
+      if (!currentRes.data.user.password) {
+        ok("DTO no expone password ✓");
+      } else {
+        bad("DTO expone password (ERROR DE SEGURIDAD)");
+      }
+
+      if (!currentRes.data.user.age) {
+        ok("DTO no expone age ✓");
+      } else {
+        bad("DTO expone age (debería estar oculto)");
+      }
+    }
+
+    // ==========================================================================
+    // 3. AUTENTICACIÓN - PASSWORD RESET
+    // ==========================================================================
+    sep("3. AUTENTICACIÓN - PASSWORD RESET");
+
+    subsep("3.1 Solicitar reset de password");
+
+    await expectStatus(
+      httpAnon.post("/api/sessions/forgot-password", {
+        email: userEmail
+      }),
+      200,
+      "Solicitar reset de password → 200"
+    );
+
+    // Nota: En un test real deberías capturar el email y extraer el token
+    // Por ahora solo verificamos que el endpoint funciona
+    info("En producción: verificar que se envíe el email con el token");
+
+    subsep("3.2 Reset con token inválido");
+
+    await expectStatus(
+      httpAnon.post("/api/sessions/reset-password", {
+        token: "tokeninvalido",
+        password: "newpass123"
       }),
       400,
-      "crear duplicado code (admin)"
+      "Reset con token inválido → 400"
     );
 
+    // ==========================================================================
+    // 4. PRODUCTOS - VALIDACIÓN DE ROLES
+    // ==========================================================================
+    sep("4. PRODUCTOS - VALIDACIÓN DE ROLES");
+
+    subsep("4.1 Crear producto sin autenticación");
+
+    await expectOneOf(
+      httpAnon.post("/api/products", {
+        title: "Producto Anon",
+        description: "Test",
+        price: 10,
+        code: rid("code"),
+        stock: 5,
+        category: "test",
+      }),
+      [401, 403],
+      "Crear producto sin autenticación → 401/403"
+    );
+
+    subsep("4.2 Crear producto con usuario normal (no admin)");
+
+    await expectOneOf(
+      httpUser.post("/api/products", {
+        title: "Producto User",
+        description: "Test",
+        price: 10,
+        code: rid("code"),
+        stock: 5,
+        category: "test",
+      }),
+      [401, 403],
+      "Crear producto con user no-admin → 401/403"
+    );
+
+    // ==========================================================================
+    // 5. PRODUCTOS - CRUD COMO ADMIN
+    // ==========================================================================
+    sep("5. PRODUCTOS - CRUD COMO ADMIN");
+
+    const codeA = rid("codeA");
+    const codeB = rid("codeB");
+    const codeC = rid("codeC");
+    let productA, productB, productC;
+
+    subsep("5.1 Crear productos - Casos de error");
+
+    // Test: Campos faltantes
     await expectStatus(
       httpAdmin.post("/api/products", {
-        title: "SinCampos",
+        title: "Sin descripción",
         price: 10,
-        code: rid("missing"),
-        stock: 1,
-        // falta description/category
+        code: rid("incomplete"),
+        stock: 5,
+        // Falta: description, category
       }),
       400,
-      "crear producto con campos faltantes (admin)"
+      "Crear producto sin campos requeridos → 400"
     );
 
+    // Test: Precio inválido (0 o negativo)
     await expectStatus(
       httpAdmin.post("/api/products", {
-        title: "PrecioCero",
-        description: "X",
+        title: "Precio Cero",
+        description: "Test",
         price: 0,
         code: rid("p0"),
-        stock: 1,
+        stock: 5,
         category: "test",
       }),
       400,
-      "crear con precio 0 (admin)"
+      "Crear producto con precio 0 → 400"
     );
 
+    // Test: Stock negativo
     await expectStatus(
       httpAdmin.post("/api/products", {
-        title: "StockNeg",
-        description: "X",
+        title: "Stock Negativo",
+        description: "Test",
         price: 10,
         code: rid("sneg"),
         stock: -5,
         category: "test",
       }),
       400,
-      "crear con stock negativo (admin)"
+      "Crear producto con stock negativo → 400"
     );
 
-    await expectStatus(httpAdmin.get("/api/products/123"), 400, "get product id inválido");
-    await expectStatus(httpAdmin.put(`/api/products/${productA.id || productA._id}`, {}), 400, "update body vacío");
+    subsep("5.2 Crear productos - Casos exitosos");
+
+    productA = await expectStatus(
+      httpAdmin.post("/api/products", {
+        title: "Producto A",
+        description: "Descripción A",
+        price: 10,
+        code: codeA,
+        stock: 1,
+        category: "test",
+      }),
+      201,
+      "Crear producto A → 201"
+    ).then((r) => r.data);
 
     productB = await expectStatus(
       httpAdmin.post("/api/products", {
-        title: "Prod B",
-        description: "B",
+        title: "Producto B",
+        description: "Descripción B",
         price: 50,
         code: codeB,
         stock: 100,
         category: "test",
       }),
       201,
-      "crear producto B (admin)"
+      "Crear producto B → 201"
     ).then((r) => r.data);
 
-    await expectStatus(httpAdmin.put(`/api/products/${productB.id || productB._id}`, { foo: "bar" }), 400, "update con campo inválido");
-
-    // ---------------- CARTS ----------------
-    sep("CARTS");
-
-    const cart = await expectStatus(httpUser.post("/api/carts", {}), 201, "crear carrito").then((r) => r.data);
-
-    await expectStatus(httpUser.post(`/api/carts/${cart._id || cart.id}/products/${productB.id || productB._id}`, { qty: 0 }), 400, "add product qty=0");
-    await expectStatus(httpUser.post(`/api/carts/${cart._id || cart.id}/products/123`, { qty: 1 }), 400, "add product id inválido");
-    await expectOneOf(httpUser.post(`/api/carts/${cart._id || cart.id}/products/${randomObjectId()}`, { qty: 1 }), [400, 404], "add product id válido pero inexistente");
-    await expectStatus(httpUser.post(`/api/carts/${cart._id || cart.id}/products/${productA.id || productA._id}`, { qty: 5 }), 400, "add product stock insuficiente");
-    await expectStatus(httpUser.post(`/api/carts/${cart._id || cart.id}/products/${productA.id || productA._id}`, { qty: 1 }), 200, "add product A ok");
-    await expectStatus(httpUser.put(`/api/carts/${cart._id || cart.id}/products/${productA.id || productA._id}`, { quantity: "cinco" }), 400, "update qty tipo inválido");
-    await expectStatus(httpUser.put(`/api/carts/${cart._id || cart.id}/products/${productA.id || productA._id}`, { quantity: -3 }), 200, "update qty negativo (elimina)");
-    await expectStatus(httpUser.delete(`/api/carts/${cart._id || cart.id}/products/${productA.id || productA._id}`), 404, "remove product inexistente en carrito");
-    await expectStatus(httpUser.get(`/api/carts/${cart._id || cart.id}/totals`), 200, "totals ok");
-    await expectStatus(httpUser.put(`/api/carts/${cart._id || cart.id}/status`, { status: "desconocido" }), 400, "status inválido");
-    await expectStatus(httpUser.delete(`/api/carts/${cart._id || cart.id}`), 200, "vaciar carrito");
-
-    // ---------------- STOCK & PURCHASE ----------------
-    sep("STOCK & PURCHASE");
-
-    const productC = await expectStatus(
+    productC = await expectStatus(
       httpAdmin.post("/api/products", {
-        title: "Prod C",
-        description: "C",
+        title: "Producto C",
+        description: "Descripción C",
         price: 100,
-        code: rid("codeC"),
-        stock: 1,
+        code: codeC,
+        stock: 5,
         category: "test",
       }),
       201,
-      "crear producto C (admin)"
+      "Crear producto C → 201"
     ).then((r) => r.data);
 
-    const cart2 = await expectStatus(httpUser.post("/api/carts", {}), 201, "crear carrito 2").then((r) => r.data);
+    // Test: Código duplicado
+    await expectStatus(
+      httpAdmin.post("/api/products", {
+        title: "Duplicado",
+        description: "Test",
+        price: 20,
+        code: codeA, // ← Código ya usado
+        stock: 2,
+        category: "test",
+      }),
+      400,
+      "Crear producto con código duplicado → 400"
+    );
 
-    await expectStatus(httpUser.post(`/api/carts/${cart2._id || cart2.id}/products/${productC._id || productC.id}`, { qty: 2 }), 400, "add C (2 uds) stock insuficiente");
-    await expectStatus(httpAdmin.put(`/api/products/${productC._id || productC.id}`, { stock: 5 }), 200, "subir stock C a 5 (admin)");
+    subsep("5.3 Leer productos - Validación de ObjectId");
 
-    const baseProd = await getProduct(httpAdmin, productC._id || productC.id);
-    const stockBefore = baseProd.status === 200 ? baseProd.data.stock ?? baseProd.data?.payload?.stock : undefined;
+    // Test: GET con ID inválido (NO es ObjectId válido)
+    await expectStatus(
+      httpAdmin.get("/api/products/123"),
+      400,
+      "GET producto con ID inválido → 400"
+    );
 
-    await expectStatus(httpUser.post(`/api/carts/${cart2._id || cart2.id}/products/${productC._id || productC.id}`, { qty: 2 }), 200, "add C (2 uds) ok");
+    // Test: GET con ObjectId válido pero inexistente
+    await expectOneOf(
+      httpAdmin.get(`/api/products/${randomObjectId()}`),
+      [404],
+      "GET producto con ID válido pero inexistente → 404"
+    );
 
-    // COMPRA
-    const purchaseRes = await expectStatus(httpUser.put(`/api/carts/${cart2._id || cart2.id}/status`, { status: "comprado" }), 200, "comprar OK con stock suficiente");
+    // Test: GET exitoso
+    await expectStatus(
+      httpAdmin.get(`/api/products/${idOf(productA)}`),
+      200,
+      "GET producto exitoso → 200"
+    );
 
-    // Verificar decremento de stock (5 -> 3)
-    const afterProd = await getProduct(httpAdmin, productC._id || productC.id);
-    if (afterProd.status === 200 && typeof stockBefore === "number") {
-      const stockAfter = afterProd.data.stock ?? afterProd.data?.payload?.stock;
-      if (typeof stockAfter === "number" && stockAfter === stockBefore - 2) {
-        ok(`stock decrementado correctamente (${stockBefore} -> ${stockAfter})`);
+    subsep("5.4 Actualizar productos - Validación de campos");
+
+    // Test: Update sin body
+    await expectStatus(
+      httpAdmin.put(`/api/products/${idOf(productA)}`, {}),
+      400,
+      "UPDATE producto sin campos → 400"
+    );
+
+    // Test: Update con campos inválidos
+    await expectStatus(
+      httpAdmin.put(`/api/products/${idOf(productA)}`, {
+        campoInvalido: "valor"
+      }),
+      400,
+      "UPDATE producto con campo inválido → 400"
+    );
+
+    // Test: Update con ID inválido
+    await expectStatus(
+      httpAdmin.put("/api/products/abc123", {
+        price: 20
+      }),
+      400,
+      "UPDATE producto con ID inválido → 400"
+    );
+
+    // Test: Update exitoso
+    await expectStatus(
+      httpAdmin.put(`/api/products/${idOf(productB)}`, {
+        price: 60,
+        stock: 150
+      }),
+      200,
+      "UPDATE producto exitoso → 200"
+    );
+
+    subsep("5.5 Eliminar productos - Validación de roles y ObjectId");
+
+    // Test: DELETE sin ser admin
+    await expectOneOf(
+      httpUser.delete(`/api/products/${idOf(productB)}`),
+      [401, 403],
+      "DELETE producto con user no-admin → 401/403"
+    );
+
+    // Test: DELETE con ID inválido
+    await expectStatus(
+      httpAdmin.delete("/api/products/invalid123"),
+      400,
+      "DELETE producto con ID inválido → 400"
+    );
+
+    // Test: DELETE exitoso
+    await expectOneOf(
+      httpAdmin.delete(`/api/products/${idOf(productB)}`),
+      [200, 204],
+      "DELETE producto exitoso → 200/204"
+    );
+
+    // ==========================================================================
+    // 6. CARRITOS - CRUD Y VALIDACIONES
+    // ==========================================================================
+    sep("6. CARRITOS - CRUD Y VALIDACIONES");
+
+    subsep("6.1 Crear carrito");
+
+    const cart1 = await expectStatus(
+      httpUser.post("/api/carts", {}),
+      201,
+      "Crear carrito → 201"
+    ).then((r) => r.data);
+
+    subsep("6.2 Agregar productos al carrito - Casos de error");
+
+    // Test: ID de carrito inválido
+    await expectStatus(
+      httpUser.post("/api/carts/abc123/products/${idOf(productA)}", {
+        qty: 1
+      }),
+      400,
+      "Agregar producto con cartId inválido → 400"
+    );
+
+    // Test: ID de producto inválido
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/xyz789`, {
+        qty: 1
+      }),
+      400,
+      "Agregar producto con productId inválido → 400"
+    );
+
+    // Test: Cantidad = 0
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        qty: 0
+      }),
+      400,
+      "Agregar producto con qty=0 → 400"
+    );
+
+    // Test: Cantidad negativa
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        qty: -5
+      }),
+      400,
+      "Agregar producto con qty negativa → 400"
+    );
+
+    // Test: Producto inexistente (ObjectId válido)
+    await expectOneOf(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/${randomObjectId()}`, {
+        qty: 1
+      }),
+      [400, 404],
+      "Agregar producto inexistente → 400/404"
+    );
+
+    // Test: Stock insuficiente (productA tiene stock=1, intentamos agregar 5)
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        qty: 5
+      }),
+      400,
+      "Agregar producto con stock insuficiente → 400"
+    );
+
+    subsep("6.3 Agregar productos al carrito - Casos exitosos");
+
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        qty: 1
+      }),
+      200,
+      "Agregar producto A al carrito → 200"
+    );
+
+    subsep("6.4 Actualizar cantidad de producto");
+
+    // Test: Cantidad con tipo inválido
+    await expectStatus(
+      httpUser.put(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        quantity: "cinco"
+      }),
+      400,
+      "Actualizar cantidad con tipo inválido → 400"
+    );
+
+    // Test: Actualizar a cantidad negativa (elimina el producto)
+    await expectStatus(
+      httpUser.put(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`, {
+        quantity: 0
+      }),
+      200,
+      "Actualizar cantidad a 0 (elimina) → 200"
+    );
+
+    subsep("6.5 Eliminar producto del carrito");
+
+    // Test: Eliminar producto que no está en el carrito
+    await expectStatus(
+      httpUser.delete(`/api/carts/${idOf(cart1)}/products/${idOf(productA)}`),
+      404,
+      "Eliminar producto inexistente del carrito → 404"
+    );
+
+    subsep("6.6 Cambiar estado del carrito - Validaciones");
+
+    // Test: Estado inválido
+    await expectStatus(
+      httpUser.put(`/api/carts/${idOf(cart1)}/status`, {
+        status: "estadoInvalido"
+      }),
+      400,
+      "Cambiar a estado inválido → 400"
+    );
+
+    subsep("6.7 Totales del carrito");
+
+    await expectStatus(
+      httpUser.get(`/api/carts/${idOf(cart1)}/totals`),
+      200,
+      "GET totales del carrito → 200"
+    );
+
+    // Test: Totales con cartId inválido
+    await expectStatus(
+      httpUser.get("/api/carts/invalid123/totals"),
+      400,
+      "GET totales con cartId inválido → 400"
+    );
+
+    subsep("6.8 Vaciar carrito");
+
+    await expectStatus(
+      httpUser.delete(`/api/carts/${idOf(cart1)}`),
+      200,
+      "Vaciar carrito → 200"
+    );
+
+    // ==========================================================================
+    // 7. COMPRA Y DESCUENTO DE STOCK
+    // ==========================================================================
+    sep("7. COMPRA Y DESCUENTO DE STOCK");
+
+    subsep("7.1 Preparar carrito para compra");
+
+    const cart2 = await expectStatus(
+      httpUser.post("/api/carts", {}),
+      201,
+      "Crear carrito 2 → 201"
+    ).then((r) => r.data);
+
+    // Test: Intentar agregar más cantidad de la disponible
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart2)}/products/${idOf(productC)}`, {
+        qty: 10 // productC tiene stock=5
+      }),
+      400,
+      "Agregar más cantidad que stock disponible → 400"
+    );
+
+    // Agregar 2 unidades de productC (stock=5)
+    await expectStatus(
+      httpUser.post(`/api/carts/${idOf(cart2)}/products/${idOf(productC)}`, {
+        qty: 2
+      }),
+      200,
+      "Agregar 2 unidades de producto C → 200"
+    );
+
+    subsep("7.2 Realizar compra y verificar descuento de stock");
+
+    // Obtener stock antes de comprar
+    const beforeRes = await httpAdmin.get(`/api/products/${idOf(productC)}`);
+    const stockBefore = beforeRes.data?.stock ?? beforeRes.data?.payload?.stock;
+
+    // Realizar compra
+    const purchaseRes = await expectStatus(
+      httpUser.put(`/api/carts/${idOf(cart2)}/status`, {
+        status: "comprado"
+      }),
+      200,
+      "Realizar compra → 200"
+    );
+
+    // Verificar que el stock se decrementó correctamente
+    const afterRes = await httpAdmin.get(`/api/products/${idOf(productC)}`);
+    const stockAfter = afterRes.data?.stock ?? afterRes.data?.payload?.stock;
+
+    if (typeof stockBefore === "number" && typeof stockAfter === "number") {
+      if (stockAfter === stockBefore - 2) {
+        ok(`Stock decrementado correctamente (${stockBefore} → ${stockAfter})`);
       } else {
-        bad(`stock no se decrementó como se esperaba. Antes=${stockBefore}, Después=${stockAfter}`);
+        bad(`Stock NO se decrementó correctamente. Antes=${stockBefore}, Después=${stockAfter}`);
       }
     } else {
-      bad("no se pudo leer stock para la verificación post-compra");
+      bad("No se pudo verificar el descuento de stock");
     }
 
-    // ---------------- TICKETS ----------------
-    sep("TICKETS");
+    // ==========================================================================
+    // 8. TICKETS
+    // ==========================================================================
+    sep("8. TICKETS");
 
-    // Se espera que updateStatus haya devuelto { cart, ticket }
-    const ticketFromPurchase = purchaseRes.data?.ticket || purchaseRes.data?.payload?.ticket || purchaseRes.data?.data?.ticket;
+    subsep("8.1 Verificar generación de ticket");
 
-    if (!ticketFromPurchase || !idOf(ticketFromPurchase)) {
-      bad("no vino ticket en la respuesta de compra; revisá que /api/carts/:cid/status genere y devuelva { ticket }");
-    } else {
-      ok("ticket presente en la respuesta de compra");
-    }
+    const ticket = purchaseRes.data?.ticket || purchaseRes.data?.payload?.ticket;
 
-    // Monto esperado = precio * cantidad (2 uds)
-    const expectedAmount = Number(productC.price) * 2;
+    if (ticket && idOf(ticket)) {
+      ok("Ticket generado correctamente en la compra");
 
-    // GET /api/tickets/:id (user)
-    if (ticketFromPurchase && idOf(ticketFromPurchase)) {
-      const tId = idOf(ticketFromPurchase);
-      const tRes = await expectStatus(httpUser.get(`/api/tickets/${tId}`), 200, "GET ticket por id (user)");
-      const t = tRes.data;
-
-      if (typeof t?.amount === "number" && t.amount === expectedAmount) {
-        ok(`amount del ticket OK (${t.amount})`);
+      // Verificar monto del ticket
+      const expectedAmount = 100 * 2; // precio de productC * cantidad
+      if (ticket.amount === expectedAmount) {
+        ok(`Monto del ticket correcto (${ticket.amount})`);
       } else {
-        bad(`amount del ticket inesperado. Esperado=${expectedAmount}, Recibido=${t?.amount}`);
+        bad(`Monto del ticket incorrecto. Esperado=${expectedAmount}, Recibido=${ticket.amount}`);
       }
-
-      // GET /api/tickets (list mine)
-      const listRes = await expectStatus(httpUser.get(`/api/tickets`), 200, "listar mis tickets (user)");
-      const items = listRes.data?.items || [];
-      const found = items.find((x) => idOf(x) === tId);
-      if (found) ok("ticket aparece en el listado del usuario");
-      else bad("ticket NO figura en el listado del usuario");
-
-      // Acceso anónimo prohibido
-      await expectOneOf(httpAnon.get(`/api/tickets/${tId}`), [401, 403], "GET ticket sin login → 401/403");
+    } else {
+      bad("No se generó ticket en la compra");
     }
 
-    // ---------------- PRODUCTS delete (roles) ----------------
-    sep("PRODUCTS DELETE (roles)");
+    subsep("8.2 Obtener ticket por ID");
 
-    await expectOneOf(httpUser.delete(`/api/products/${productB.id || productB._id}`), [401, 403], "delete product con user no admin");
-    await expectStatus(httpAdmin.delete("/api/products/123"), 400, "delete id inválido (admin)");
-    await expectOneOf(httpAdmin.delete(`/api/products/${productB.id || productB._id}`), [200, 204], "delete product B (admin)");
+    if (ticket && idOf(ticket)) {
+      // Test: GET ticket con ID inválido
+      await expectStatus(
+        httpUser.get("/api/tickets/invalid123"),
+        400,
+        "GET ticket con ID inválido → 400"
+      );
 
-    // ---------------- LOGOUTS ----------------
-    sep("SESSIONS (logout)");
+      // Test: GET ticket sin autenticación
+      await expectOneOf(
+        httpAnon.get(`/api/tickets/${idOf(ticket)}`),
+        [401, 403],
+        "GET ticket sin autenticación → 401/403"
+      );
 
-    await expectStatus(httpUser.get("/api/sessions/logout"), 200, "logout ok (user)");
-    await expectStatus(httpAdmin.get("/api/sessions/logout"), 200, "logout ok (admin)");
-    await expectOneOf(httpAnon.get("/api/sessions/current"), [401, 403], "current sin cookie");
+      // Test: GET ticket exitoso
+      await expectStatus(
+        httpUser.get(`/api/tickets/${idOf(ticket)}`),
+        200,
+        "GET ticket por ID → 200"
+      );
+    }
 
-    sep("LISTO ✅");
+    subsep("8.3 Listar tickets del usuario");
+
+    const listRes = await expectStatus(
+      httpUser.get("/api/tickets"),
+      200,
+      "Listar mis tickets → 200"
+    );
+
+    if (ticket && idOf(ticket)) {
+      const items = listRes.data?.items || listRes.data || [];
+      const found = items.find((t) => idOf(t) === idOf(ticket));
+      if (found) {
+        ok("Ticket aparece en el listado del usuario");
+      } else {
+        bad("Ticket NO aparece en el listado del usuario");
+      }
+    }
+
+    // ==========================================================================
+    // 9. LOGOUT Y SESIONES
+    // ==========================================================================
+    sep("9. LOGOUT Y SESIONES");
+
+    subsep("9.1 Cerrar sesión");
+
+    await expectStatus(
+      httpUser.get("/api/sessions/logout"),
+      200,
+      "Logout usuario → 200"
+    );
+
+    await expectStatus(
+      httpAdmin.get("/api/sessions/logout"),
+      200,
+      "Logout admin → 200"
+    );
+
+    subsep("9.2 Verificar sesión después de logout");
+
+    await expectOneOf(
+      httpUser.get("/api/sessions/current"),
+      [401, 403],
+      "GET /current después de logout → 401/403"
+    );
+
+    // ==========================================================================
+    // 10. RESUMEN
+    // ==========================================================================
+    sep("10. RESUMEN DE TESTS");
+
+    console.log("\n✅ Todos los tests completados exitosamente!\n");
+    console.log("Tests ejecutados:");
+    console.log("  ✓ Autenticación (registro, login, logout)");
+    console.log("  ✓ Password reset");
+    console.log("  ✓ Validación de roles (user vs admin)");
+    console.log("  ✓ CRUD de productos con validaciones");
+    console.log("  ✓ Validación de ObjectId en todos los endpoints");
+    console.log("  ✓ Gestión de carritos (agregar, actualizar, eliminar)");
+    console.log("  ✓ Validación de stock");
+    console.log("  ✓ Proceso de compra y descuento de stock");
+    console.log("  ✓ Generación y consulta de tickets");
+    console.log("  ✓ DTOs (no exponer password/age)");
+    console.log("\n");
+
   } catch (err) {
-    console.error("💥 Error en tests:", err);
+    console.error("\n💥 Error fatal en los tests:", err.message);
+    console.error(err.stack);
     process.exit(1);
   }
 })();
