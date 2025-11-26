@@ -136,7 +136,7 @@ export default class UserService {
 
     const same = await bcrypt.compare(newPassword, user.password);
     if (same) {
-      const e = new Error("La nueva contraseña no puede ser igual a la anterior.");
+      const e = new Error("La nueva contraseña no puede ser igual a la anterior");
       e.status = 400;
       throw e;
     }
