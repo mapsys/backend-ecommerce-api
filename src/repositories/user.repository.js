@@ -14,5 +14,6 @@ export default class UserRepository {
   // Escrituras / updates
   async create(data) { return this.dao.create(data); }
   async updateById(id, data) { return this.dao.updateById(id, data); }
+  async updatePassword(id, newPassword) { return this.dao.updatePassword(id, newPassword); }
   async setCart(userId, newCartId) { return this.dao.setCart(userId, newCartId); }
 }

@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import Cart from "../models/cart.model.js";
 import UserRepository from "../repositories/user.repository.js";
-import {sendPasswordResetEmail} from "../utils/mailer.js";
+import { sendPasswordResetEmail } from "../utils/mailer.js";
 const JWT_SECRET = process.env.JWT_SECRET || "coderSecret";
 const RESET_SECRET = process.env.JWT_RESET_SECRET || process.env.JWT_SECRET || "coderSecret";
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:8080";
@@ -135,7 +135,7 @@ export default class UserService {
       throw e;
     }
 
-    const hashed = await bcrypt.hash(newPassword, 10);
-    await this.repo.updateById(user._id, { password: hashed });
+    // Usamos updatePassword que ejecuta el hook pre('save') para hashear
+    await this.repo.updatePassword(user._id, newPassword);
   }
 }

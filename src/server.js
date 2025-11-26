@@ -1,10 +1,6 @@
 import dotenv from "dotenv";
 import express from "express";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import { createServer } from "http";
-import ProductManager from "./managers/productManagerMongo.js";
-import CartManager from "./managers/cartManagerMongo.js";
 import productsRouter from "./routes/products.router.js";
 import sessionsRouter from "./routes/sessions.router.js";
 import cartsRouter from "./routes/carts.router.js";
@@ -21,9 +17,6 @@ import ProductService from "./services/product.service.js";
 
 // Uso de Env para la conexion
 dotenv.config();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const dataPath = join(__dirname, "src/data");
 
 // Configuro express y Socket.IO
 const app = express();
@@ -33,14 +26,14 @@ const io = new Server(httpServer);
 const productService = new ProductService();
 
 const PORT = process.env.PORT || 8080;
-const productManager = new ProductManager();
-const cartManager = new CartManager();
 
 // Configuro CORS para API
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || "*",
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+    credentials: true,
+  })
+);
 
 // Configuro Passport
 iniciarPassport();
