@@ -1,7 +1,9 @@
 // src/services/product.service.js
+import mongoose from "mongoose";
 import ProductRepository from "../repositories/product.repository.js";
 
 const ALLOWED_FIELDS = ["description", "price", "category", "thumbnails", "title", "code", "stock", "status"];
+const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 export default class ProductService {
   constructor(repo = new ProductRepository()) {
@@ -48,6 +50,11 @@ export default class ProductService {
   }
 
   async getById(id) {
+    if (!isObjectId(id)) {
+      const err = new Error("ID inválido");
+      err.status = 400;
+      throw err;
+    }
     const prod = await this.repo.getById(id);
     if (!prod) {
       const err = new Error("Producto no encontrado");
@@ -64,6 +71,11 @@ export default class ProductService {
   }
 
   async update(id, updatedFields = {}) {
+    if (!isObjectId(id)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     if (Object.keys(updatedFields).length === 0) {
       const e = new Error("No hay campos para actualizar");
       e.status = 400;
@@ -105,6 +117,11 @@ export default class ProductService {
   }
 
   async remove(id) {
+    if (!isObjectId(id)) {
+      const err = new Error("ID inválido");
+      err.status = 400;
+      throw err;
+    }
     const prod = await this.repo.remove(id);
     if (!prod) {
       const err = new Error("Producto no encontrado");

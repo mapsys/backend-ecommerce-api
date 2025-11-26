@@ -15,6 +15,11 @@ export default class CartService {
   }
 
   async getById(id, opts) {
+    if (!isObjectId(id)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     const cart = await this.repo.findById(id, opts);
     if (!cart) {
       const e = new Error("Carrito no encontrado");
@@ -93,6 +98,11 @@ export default class CartService {
   }
 
   async clear(cartId) {
+    if (!isObjectId(cartId)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     const updated = await this.repo.clearProducts(cartId);
     if (!updated) {
       const e = new Error("Carrito no encontrado");
@@ -103,6 +113,11 @@ export default class CartService {
   }
 
   async replaceProducts(cartId, products) {
+    if (!isObjectId(cartId)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     if (!Array.isArray(products) || products.length === 0) {
       const e = new Error("Debe enviar una lista de productos");
       e.status = 400;
@@ -179,6 +194,11 @@ export default class CartService {
   }
 
   async updateStatus(cartId, status) {
+    if (!isObjectId(cartId)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     if (!ALLOWED_STATUS.includes(status)) {
       const e = new Error(`Estado inválido. Valores permitidos: ${ALLOWED_STATUS.join(", ")}`);
       e.status = 400;
@@ -229,6 +249,11 @@ export default class CartService {
   }
 
   async totals(cartId) {
+    if (!isObjectId(cartId)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     // valida existencia del carrito primero
     const exists = await this.repo.findById(cartId);
     if (!exists) {

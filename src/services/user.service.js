@@ -87,6 +87,11 @@ export default class UserService {
   }
 
   async getCurrentFromDB(userId) {
+    if (!isObjectId(userId)) {
+      const e = new Error("ID inválido");
+      e.status = 400;
+      throw e;
+    }
     const user = await this.repo.findById(userId);
     if (!user) {
       const e = new Error("Usuario no encontrado");
@@ -97,6 +102,7 @@ export default class UserService {
   }
 
   async findByIdSafe(id) {
+    if (!isObjectId(id)) return null;
     const user = await this.repo.findByIdLean(id);
     if (!user) return null;
     const { password, ...safe } = user;
